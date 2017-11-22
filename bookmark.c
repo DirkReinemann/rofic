@@ -2,33 +2,34 @@
 #include <stdio.h>
 #include <sqlite3.h>
 #include <string.h>
+#include <regex.h>
+#include <dirent.h>
 
-static const char *DBFILE = ".mozilla/firefox/fth9gwv2.default/places.sqlite";
-static const char *LISTQUERY = "SELECT f.title, b.title FROM moz_bookmarks b INNER JOIN moz_bookmarks f ON b.parent=f.id INNER JOIN moz_places p ON b.fk=p.id WHERE p.rev_host IS NOT NULL ORDER BY f.title";
-static const char *FINDQUERY = "SELECT p.url FROM moz_bookmarks b INNER JOIN moz_bookmarks f ON b.parent=f.id INNER JOIN moz_places p ON b.fk=p.id WHERE p.rev_host IS NOT NULL AND b.title=?";
+const char *FIREFOXDIR = ".mozilla/firefox";
+const char *FIREFOXDBFILE = "places.sqlite";
+const char *FIREFOXDIRREGEX = "default$";
+const char *LISTQUERY = "SELECT f.title, b.title FROM moz_bookmarks b INNER JOIN moz_bookmarks f ON b.parent=f.id INNER JOIN moz_places p ON b.fk=p.id WHERE p.rev_host IS NOT NULL ORDER BY f.title";
+const char *FINDQUERY = "SELECT p.url FROM moz_bookmarks b INNER JOIN moz_bookmarks f ON b.parent=f.id INNER JOIN moz_places p ON b.fk=p.id WHERE p.rev_host IS NOT NULL AND b.title=?";
 
 typedef struct {
-    char folder[BUFSIZ];
-    char name[BUFSIZ];
-} Bookmark;
+    char *folder;
+    char *name;
+} bookmark;
 
 typedef struct {
-    Bookmark *data;
-    int       len;
-    int       flength;
-} Bookmarks;
+    int          size;
+    unsigned int flength;
+    bookmark *   data;
+} bookmarks;
 
-int list()
+int list(const char *dbfile)
 {
     sqlite3 *db;
     sqlite3_stmt *stmt;
-    int rc;
+    int rc = 0;
+    size_t size = 0;
 
-    char filename[BUFSIZ];
-
-    snprintf(filename, BUFSIZ, "%s/%s", getenv("HOME"), DBFILE);
-
-    rc = sqlite3_open(filename, &db);
+    rc = sqlite3_open(dbfile, &db);
     if (rc != SQLITE_OK) {
         sqlite3_close(db);
         exit(1);
@@ -40,49 +41,58 @@ int list()
         exit(1);
     }
 
-    Bookmarks bookmarks;
-    bookmarks.len = 0;
-    bookmarks.flength = 0;
-    bookmarks.data = (Bookmark *)malloc(0 * sizeof(Bookmark));
+    bookmarks bs;
+    bs.size = 0;
+    bs.flength = 0;
+    bs.data = (bookmark *)malloc(0 * sizeof(bookmark));
 
     while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-        bookmarks.data = (Bookmark *)realloc(bookmarks.data, (bookmarks.len + 1) * sizeof(Bookmark));
+        bs.data = (bookmark *)realloc(bs.data, (bs.size + 1) * sizeof(bookmark));
+        bookmark *b = bs.data + bs.size;
 
-        Bookmark bookmark;
-        snprintf(bookmark.folder, BUFSIZ, (char *)sqlite3_column_text(stmt, 0));
-        snprintf(bookmark.name, BUFSIZ, (char *)sqlite3_column_text(stmt, 1));
+        char *folder = (char *)sqlite3_column_text(stmt, 0);
+        char *name = (char *)sqlite3_column_text(stmt, 1);
 
-        int l = strlen(bookmark.folder);
-        if (l > bookmarks.flength)
-            bookmarks.flength = l;
+        size = strlen(folder) + 1;
+        b->folder = (char *)malloc(size * sizeof(char));
+        strncpy(b->folder, folder, size);
+        b->folder[size - 1] = '\0';
 
-        *(bookmarks.data + bookmarks.len) = bookmark;
-        bookmarks.len++;
+        if (size > bs.flength)
+            bs.flength = size;
+
+        size = strlen(name) + 1;
+        b->name = (char *)malloc(size * sizeof(char));
+        strncpy(b->name, name, size);
+        b->name[size - 1] = '\0';
+
+        bs.size++;
     }
 
-    for (int i = 0; i < bookmarks.len; i++) {
-        Bookmark *bookmark = (bookmarks.data + i);
-        printf("%-*s : %s\n", bookmarks.flength, bookmark->folder, bookmark->name);
-    }
+    for (int i = 0; i < bs.size; i++) {
+        bookmark *b = bs.data + i;
+        printf("%-*s : %s\n", bs.flength, b->folder, b->name);
 
-    free(bookmarks.data);
+        if (b->folder != NULL)
+            free(b->folder);
+        if (b->name != NULL)
+            free(b->name);
+    }
+    free(bs.data);
     sqlite3_finalize(stmt);
     sqlite3_close(db);
     return 0;
 }
 
-int open(char *str)
+int open(const char *dbfile, const char *name)
 {
     sqlite3 *db;
     sqlite3_stmt *stmt;
     int rc;
 
-    str = strchr(str, ':') + 2;
+    name = strchr(name, ':') + 2;
 
-    char filename[BUFSIZ];
-    snprintf(filename, BUFSIZ, "%s/%s", getenv("HOME"), DBFILE);
-
-    rc = sqlite3_open(filename, &db);
+    rc = sqlite3_open(dbfile, &db);
     if (rc != SQLITE_OK) {
         sqlite3_close(db);
         return 1;
@@ -90,11 +100,12 @@ int open(char *str)
 
     rc = sqlite3_prepare_v2(db, FINDQUERY, strlen(FINDQUERY), &stmt, 0);
     if (rc != SQLITE_OK) {
+        sqlite3_finalize(stmt);
         sqlite3_close(db);
         return 1;
     }
 
-    rc = sqlite3_bind_text(stmt, 1, str, strlen(str), SQLITE_STATIC);
+    rc = sqlite3_bind_text(stmt, 1, name, strlen(name), SQLITE_STATIC);
     if (rc != SQLITE_OK) {
         sqlite3_finalize(stmt);
         sqlite3_close(db);
@@ -102,29 +113,72 @@ int open(char *str)
     }
 
     if (sqlite3_step(stmt) == SQLITE_ROW) {
-        char url[BUFSIZ];
-        snprintf(url, BUFSIZ, (char *)sqlite3_column_text(stmt, 0));
-        char cmd[BUFSIZ];
-        snprintf(cmd, BUFSIZ, "firefox %s && i3-msg \"workspace 2: browser\" >/dev/null 2>&1", url);
+        char *url = (char *)sqlite3_column_text(stmt, 0);
+        const char *cmdfmt = "firefox %s && i3-msg \"workspace 2: browser\" >/dev/null 2>&1";
+        size_t size = strlen(url) + strlen(cmdfmt);
+        char cmd[size];
+        snprintf(cmd, size, cmdfmt, url);
         system(cmd);
     }
-
     sqlite3_finalize(stmt);
     sqlite3_close(db);
     return 0;
 }
 
-int main(int argc, char *argv[])
+char *read_dbfile(const char *home)
+{
+    DIR *dir;
+    struct dirent *entry;
+    regex_t regex;
+    char *dbfile = NULL;
+    size_t size = 0;
+
+    size = strlen(home) + strlen(FIREFOXDIR) + 2;
+    char path[size];
+    snprintf(path, size, "%s/%s", home, FIREFOXDIR);
+
+    if (!(dir = opendir(path)))
+        return dbfile;
+    if (!(entry = readdir(dir)))
+        return dbfile;
+
+    int found = 0;
+    regcomp(&regex, FIREFOXDIRREGEX, 0);
+    do {
+        if (entry->d_type == DT_DIR) {
+            if (!regexec(&regex, entry->d_name, 0, NULL, 0)) {
+                size = size + strlen(entry->d_name) + strlen(FIREFOXDBFILE) + 3;
+                dbfile = (char *)malloc(size * sizeof(char));
+                snprintf(dbfile, size, "%s/%s/%s", path, entry->d_name, FIREFOXDBFILE);
+                found = 1;
+            }
+        }
+    } while ((entry = readdir(dir)) != NULL && found == 0);
+    closedir(dir);
+    return dbfile;
+}
+
+int main(int argc, char **argv)
 {
     char *home = getenv("HOME");
 
-    if (home == NULL) {
-        printf("Error while accessing home directory.\n");
+    if (home == NULL)
         return 1;
+    char *dbfile = read_dbfile(home);
+
+    int ret = 0;
+    if (argc == 1) {
+        ret = list(dbfile);
+    } else {
+        char *name = argv[1];
+        if (name == NULL || strlen(name) == 0)
+            ret = 1;
+        else
+            ret = open(dbfile, name);
     }
 
-    if (argc == 1)
-        return list();
-    else
-        return open(argv[1]);
+    if (dbfile != NULL)
+        free(dbfile);
+
+    return ret;
 }
