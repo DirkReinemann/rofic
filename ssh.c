@@ -105,12 +105,11 @@ void list()
     char *line = NULL;
     size_t len = 0;
     ssize_t read = 0;
-
     char *home = getenv("HOME");
     int flength = strlen(home) + strlen(CONFIGFILE) + 2;
     char filename[flength];
 
-    snprintf(filename, flength, "%s/%s", getenv("HOME"), CONFIGFILE);
+    snprintf(filename, flength, "%s/%s", home, CONFIGFILE);
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
         printf("The file '%s' was not found.\n", filename);
