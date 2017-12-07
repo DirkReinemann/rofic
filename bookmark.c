@@ -27,7 +27,6 @@ int list(const char *dbfile)
     sqlite3 *db;
     sqlite3_stmt *stmt;
     int rc = 0;
-    size_t size = 0;
 
     rc = sqlite3_open(dbfile, &db);
     if (rc != SQLITE_OK) {
@@ -53,7 +52,7 @@ int list(const char *dbfile)
         char *folder = (char *)sqlite3_column_text(stmt, 0);
         char *name = (char *)sqlite3_column_text(stmt, 1);
 
-        size = strlen(folder) + 1;
+        size_t size = strlen(folder) + 1;
         b->folder = (char *)malloc(size * sizeof(char));
         strncpy(b->folder, folder, size);
         b->folder[size - 1] = '\0';

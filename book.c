@@ -103,7 +103,7 @@ void list(char *path)
     files fs;
 
     fs.size = 0;
-    fs.data = (file *)calloc(0, sizeof(file));
+    fs.data = (file *)malloc(0 * sizeof(file));
     listdir(path, strlen(path), &fs);
     qsort(fs.data, fs.size, sizeof(file), comp);
     for (int i = 0; i < fs.size; i++) {
