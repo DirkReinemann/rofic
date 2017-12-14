@@ -26,11 +26,12 @@ void list(char *path)
     if (!(entry = readdir(dir)))
         return;
 
+    char *ptr = NULL;
     do {
         if (entry->d_type != DT_DIR) {
             char *ending = strrchr(entry->d_name, '.');
             if (ending && !strcmp(ending, FILEENDING)) {
-                char *token = strtok(entry->d_name, ".");
+                char *token = strtok_r(entry->d_name, ".", &ptr);
                 printf("%s\n", token);
             }
         }

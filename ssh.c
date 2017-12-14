@@ -47,23 +47,23 @@ char *read_value(const char *key, char *str, char *ret)
 {
     regex_t regex;
     regmatch_t matches[1];
-
     regcomp(&regex, key, REG_ICASE);
-
     int s = strlen(str);
-    char tmp[s];
+    char tmp[s + 1];
     strncpy(tmp, str, s);
-    char *token = strtok(tmp, SEPARATOR);
+    tmp[s] = '\0';
+    char *ptr;
+    char *token = strtok_r(tmp, SEPARATOR, &ptr);
     int found = 0;
     while (token != NULL && found != 1) {
         if (!regexec(&regex, token, 1, matches, 0)) {
             int len = strlen(token) - matches[0].rm_eo;
-            ret = (char *)malloc(sizeof(char) * len);
+            ret = (char *)malloc(len * sizeof(char));
             strncpy(ret, token + matches[0].rm_eo + 1, len - 1);
             ret[len - 1] = '\0';
             found = 1;
         }
-        token = strtok(NULL, SEPARATOR);
+        token = strtok_r(NULL, SEPARATOR, &ptr);
     }
     if (found == -1)
         ret = NULL;
@@ -74,7 +74,6 @@ int compare_config(const void *a, const void *b)
 {
     config *ca = (config *)a;
     config *cb = (config *)b;
-
     return strcoll(ca->name, cb->name);
 }
 
@@ -119,9 +118,9 @@ void list()
     configs cs;
     init_configs(&cs);
 
-    char *lines = (char *)calloc(1024, sizeof(char));
     int l = 0;
     int r = 0;
+    char *lines = (char *)calloc(1024, sizeof(char));
     while ((read = getline(&line, &len, file)) != -1) {
         if (read == 1) {
             cs.data = (config *)realloc(cs.data, (cs.size + 1) * sizeof(config));
@@ -143,8 +142,8 @@ void list()
         } else {
             r = strlen(line);
             line[r - 1] = '\0';
-            l += snprintf(lines + l, r, remove_whitespace(line));
-            l += snprintf(lines + l, 2, SEPARATOR);
+            l += snprintf(lines + l, r, "%s", remove_whitespace(line));
+            l += snprintf(lines + l, 2, "%s", SEPARATOR);
         }
         if (line != NULL) {
             free(line);
