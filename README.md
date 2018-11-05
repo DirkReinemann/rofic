@@ -21,4 +21,4 @@ My scripts for rofi.
 | bookmark.c | firefox, sqlite3 | reads all bookmarks from firefox, opens them |
 | screen.c | | reads all xrandr scripts from a directory, executes them |
 | ssh.c | terminator | reads all information from ssh config, opens connections |
-| websearch.c | firefox, curl, uuid | searches for a keyword on startpage |
+| websearch.c | firefox, curl | searches for a keyword on startpage |
