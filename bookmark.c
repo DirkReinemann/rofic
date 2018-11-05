@@ -157,17 +157,41 @@ char *read_dbfile(const char *home)
     return dbfile;
 }
 
+void copy_file(char *src, char *dst)
+{
+    FILE *f_src = fopen(src, "r");
+    FILE *f_dst = fopen(dst, "w");
+
+    if (f_src != NULL && f_dst != NULL) {
+        int ch = 0;
+        while ((ch = fgetc(f_src)) != EOF)
+            fputc(ch, f_dst);
+    }
+
+    if (f_src != NULL)
+        fclose(f_src);
+
+    if (f_dst != NULL)
+        fclose(f_dst);
+}
+
 int main(int argc, char **argv)
 {
     char *home = getenv("HOME");
 
     if (home == NULL)
         return 1;
+
     char *dbfile = read_dbfile(home);
+    size_t size = strlen(FIREFOXDBFILE) + 6;
+    char tmpfile[size];
+
+    snprintf(tmpfile, size, "/tmp/%s", FIREFOXDBFILE);
+    copy_file(dbfile, tmpfile);
 
     int ret = 0;
     if (argc == 1) {
-        ret = list(dbfile);
+        ret = list(tmpfile);
     } else {
         char *name = argv[1];
         if (name == NULL || strlen(name) == 0)
@@ -178,6 +202,8 @@ int main(int argc, char **argv)
 
     if (dbfile != NULL)
         free(dbfile);
+
+    remove(tmpfile);
 
     return ret;
 }
