@@ -18,7 +18,7 @@ clean:
 	-rm -r *.memcheck
 
 memcheck: compile
-	$(foreach obj,$(OBJECTS),echo memcheck $(obj) && $(MEMCHECKCMD) ./$(obj) >/dev/null 2>$(obj).memcheck;)
+	@$(foreach obj,$(OBJECTS),echo memcheck $(obj) && $(MEMCHECKCMD) ./$(obj) >/dev/null 2>$(obj).memcheck;)
 
 install: compile
 	-mkdir -p $(INSTALLDIR)

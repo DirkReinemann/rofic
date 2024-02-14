@@ -28,7 +28,7 @@ Search the web with you favourite search engine. Executes the command provided b
 ```bash
 # Command:  $BROWSER_CMD $BROWSER_ARGS $SEARCH_FMT
 # Defaults: firefox      new-tab       https://duckduckgo.com/?q=%s
-firefox new-tab https://duckduckgo.com/?q=%s
+firefox new-tab https://duckduckgo.com/?q24s
 ```
 
 | Variable | Default | Description |
