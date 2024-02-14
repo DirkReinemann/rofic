@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-g -O2 -std=c11 -pipe -Wall -Wextra -pedantic -D_GNU_SOURCE `pkg-config --cflags --libs libcurl sqlite3 uuid`
+CFLAGS=-g -O2 -std=c11 -pipe -Wall -Wextra -pedantic
 OBJECTS=$(patsubst %.c,%.o,$(wildcard *.c))
 MEMCHECKCMD=valgrind --tool=memcheck
 INSTALLDIR=$(HOME)/.config/rofi
