@@ -11,5 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: make compile
+
+    - name: gcc compile
       run: make compile
+
+    - name: valgrind memcheck
+      run: |
+        sudo apt-get install -y valgrind
+        make memcheck
