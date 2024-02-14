@@ -1,67 +1,68 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <curl/curl.h>
-#include <uuid/uuid.h>
-#include <sys/stat.h>
+#include <errno.h>
+#include <unistd.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
-const char *OUTDIR = "/tmp/rofi-search";
-const char *SEARCHURL = "https://www.startpage.com/do/search";
+static const char BROWSER_CMD[] = "firefox";
+static const char BROWSER_ARGS[] = "new-tab";
+static const char SEARCH_FMT[] = "https://duckduckgo.com/?q=%s";
 
-size_t wfile(void *ptr, size_t size, size_t nmemb, void *stream)
+void execute_websearch(const char *browser_cmd, const char *browser_args,
+                       const char *search_fmt, const char *search_term)
 {
-    size_t written = fwrite(ptr, size, nmemb, (FILE *)stream);
+    pid_t child = fork();
+    if (child == 0) {
+        char search_cmd[100];
+        snprintf(search_cmd, 100, search_fmt, search_term);
+        char *argv[3] = {
+            (char *) browser_args, search_cmd, NULL
+        };
+        if (execvp(browser_cmd, argv) < 0) {
+            fprintf(stderr, "Command execution failed: %s\n", strerror(errno));
+            exit(1);
+        }
+    } else if (child > 0) {
+        int wstatus;
+        if (wait(&wstatus) < 0) {
+            fprintf(stderr, "Wait failed: %s\n", strerror(errno));
+            exit(1);
+        }
 
-    return written;
+    } else {
+        fprintf(stderr, "Fork failed: %s\n", strerror(errno));
+        exit(1);
+    }
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv)
 {
-    if (argc != 2)
-        exit(1);
-
-    char *search = argv[1];
-    if (search == NULL || strlen(search) == 0)
-        exit(1);
-
-    mkdir(OUTDIR, 0755);
-
-    CURL *curl = curl_easy_init();
-    if (curl == NULL)
-        exit(1);
-
-    size_t size;
-    uuid_t uuid;
-
-    const char *datafmt = "cmd=process_search&language=english&enginecount=1&pl&abp=1&ff&theme&flag_ac=0&cat=web&ycc=0&t&nj=0&query=%s&pg=0";
-    size = strlen(datafmt) + strlen(search);
-    char data[size];
-    snprintf(data, size, datafmt, search);
-
-    curl_easy_setopt(curl, CURLOPT_URL, SEARCHURL);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, wfile);
-
-    char filename[37];
-    uuid_generate(uuid);
-    uuid_unparse(uuid, filename);
-
-    size = strlen(OUTDIR) + strlen(filename) + 2;
-    char outfile[size];
-    snprintf(outfile, size, "%s/%s", OUTDIR, filename);
-
-    FILE *file = fopen(outfile, "wb");
-    if (file) {
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, file);
-        curl_easy_perform(curl);
-        fclose(file);
-
-        const char *cmdfmt = "firefox %s && i3-msg \"workspace 2: browser\" >/dev/null 2>&1";
-        size = strlen(cmdfmt) + strlen(outfile);
-        char cmd[size];
-        snprintf(cmd, BUFSIZ, cmdfmt, outfile);
-        system(cmd);
+    if (argc < 2) {
+        exit(0);
     }
-    curl_easy_cleanup(curl);
+
+    const char *browser_cmd = getenv("BROWSER_CMD");
+    if (browser_cmd == NULL) {
+        browser_cmd = BROWSER_CMD;
+    }
+    const char *browser_args = getenv("BROWSER_ARGS");
+    if (browser_args == NULL) {
+        browser_args = BROWSER_ARGS;
+    }
+    const char *search_fmt = getenv("SEARCH_FMT");
+    if (search_fmt == NULL) {
+        search_fmt = SEARCH_FMT;
+    }
+
+    char *search_term = argv[1];
+    if (search_term == NULL || strlen(search_term) == 0) {
+        fprintf(stderr, "Error while reading argument\n");
+        exit(1);
+    }
+
+    execute_websearch(browser_cmd, browser_args, search_fmt, search_term);
+
+    return 0;
 }

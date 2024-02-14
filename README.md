@@ -1,24 +1,48 @@
-# rofi-scripts
+# Extensions for Rofi
 
-My scripts for rofi.
+Extension for [Rofi](https://github.com/davatorium/rofi) written in C.
 
-## makefile
+## Installation
 
-| command | description |
-| - | - |
-| make | compile all c files |
-| make compile | same as above |
-| make clean | remove all c compiles and memcheck outputs |
-| make memcheck | check heap usage of all c executables with valgrind |
-| make install | copy all c executables to $HOME/.config/rofi |
-| make uninstall | rcopy all c executables from $HOME/.config/rofi |
+```bash
+# Install in default directory $HOME/.config/rofi
+make install
 
-## scripts
+# Install in directory ~/.rofi
+make install INSTALLDIR=~/.rofi
 
-| file | dependencies | description |
-| - | - | - |
-| book.c | | reads all pdf files from a directory and displays, opens them |
-| bookmark.c | firefox, sqlite3 | reads all bookmarks from firefox, opens them |
-| screen.c | | reads all xrandr scripts from a directory, executes them |
-| ssh.c | terminator | reads all information from ssh config, opens connections |
-| websearch.c | firefox, curl | searches for a keyword on startpage |
+# launch rofi with websearch extension
+rofi -show drun -modi "drun,websearch:$PWD/websearch.o"
+
+# launch rofi with websearch extension and google search engine
+export SEARCH_FMT="https://www.google.com/search?q=test"
+rofi -show drun -modi "drun,websearch:$PWD/websearch.o"
+```
+
+## Extensions
+
+### Websearch
+
+Search the web with you favourite search engine. Executes the command provided by environment variables with default values. You can also change them to your prefered settings.
+
+```bash
+# Command:  $BROWSER_CMD $BROWSER_ARGS $SEARCH_FMT
+# Defaults: firefox      new-tab       https://duckduckgo.com/?q=%s
+firefox new-tab https://duckduckgo.com/?q=%s
+```
+
+| Variable | Default | Description |
+| ---  | --- | --- |
+| BROWSER_CMD | firefox | The command to the browser executable. |
+| BROWSER_ARGS | new-tab | The arguments to pass to the browser command. |
+| SEARCH_FMT | https://duckduckgo.com/?q=%s | The url that is called with the format %s string that will be replaced by the search term later. |
+
+## Development
+
+```bash
+# install gcc for compilation, valgrind for memcheck 
+sudo pacman -S gcc valgrind
+
+# execute tests
+make test
+```
